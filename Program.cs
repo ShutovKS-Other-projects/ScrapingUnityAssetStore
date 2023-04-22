@@ -1,4 +1,4 @@
 ﻿using ParsingMarketPlaces;
 
-new ScrapingUnityAssetStore("Anime", 2, 3);
-Console.WriteLine("Anime Scraping");
+new ScrapingUnityAssetStore(1,7);
+Console.WriteLine("Scraping end");

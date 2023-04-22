@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using OfficeOpenXml;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
@@ -8,6 +9,8 @@ public class ScrapingUnityAssetStore
 {
     #region Variables
 
+    private const string Url = "https://assetstore.unity.com";
+
     private readonly int _pageStart = 1;
     private readonly int _pageEnd = int.MaxValue;
     private readonly string _search = "";
@@ -15,8 +18,7 @@ public class ScrapingUnityAssetStore
     private readonly bool _isPageStart;
     private readonly bool _isPageEnd;
 
-    private int _page;
-    private const string Url = "https://assetstore.unity.com";
+    private readonly int _page;
 
     private string Link()
     {
@@ -28,11 +30,11 @@ public class ScrapingUnityAssetStore
         return link;
     }
 
-    private List<string> _linksToAssets = new();
+    private readonly List<string> _linksToAssets = new();
 
-    private IWebDriver _driver = null;
-    private FileInfo _file = new FileInfo(@"sample1.xlsx");
-    private ExcelPackage _excelPackage = new ExcelPackage();
+    private IWebDriver? _driver = null;
+    private readonly FileInfo _file = new FileInfo(@"sample.xlsx");
+    private readonly ExcelPackage _excelPackage = new ExcelPackage();
 
     #endregion
 
@@ -40,9 +42,9 @@ public class ScrapingUnityAssetStore
 
     public ScrapingUnityAssetStore(string search, int pageStart, int pageEnd)
     {
-        this._search = search;
-        this._pageStart = pageStart;
-        this._pageEnd = pageEnd;
+        _search = search;
+        _pageStart = pageStart;
+        _pageEnd = pageEnd;
 
         _page = pageStart;
 
@@ -50,61 +52,77 @@ public class ScrapingUnityAssetStore
         _isPageStart = true;
         _isPageEnd = true;
 
-        Console.WriteLine(Link());
+        Work();
+    }
 
-        Initialize();
-        GetReferencesToAssets();
-        FillInExel();
-        _excelPackage.SaveAs(_file);
-        Clean();
+    public ScrapingUnityAssetStore(int pageStart, int pageEnd)
+    {
+        _pageStart = pageStart;
+        _pageEnd = pageEnd;
+
+        _page = pageStart;
+
+        _isPageStart = true;
+        _isPageEnd = true;
+
+        Work();
+    }
+
+    public ScrapingUnityAssetStore(int pageStart)
+    {
+        _pageStart = pageStart;
+
+        _page = pageStart;
+
+        _isPageStart = true;
+
+        Work();
     }
 
     public ScrapingUnityAssetStore(string search, int pageStart)
     {
-        this._search = search;
-        this._pageStart = pageStart;
+        _search = search;
+        _pageStart = pageStart;
 
         _page = pageStart;
 
         _isSearch = true;
         _isPageStart = true;
 
-        Initialize();
-        GetReferencesToAssets();
-        FillInExel();
-        _excelPackage.SaveAs(_file);
-        Clean();
+        Work();
     }
 
     public ScrapingUnityAssetStore(string search)
     {
-        this._search = search;
+        _search = search;
 
         _page = _pageStart;
 
         _isSearch = true;
 
-        Initialize();
-        GetReferencesToAssets();
-        FillInExel();
-        _excelPackage.SaveAs(_file);
-        Clean();
+        Work();
     }
 
     public ScrapingUnityAssetStore()
     {
         _page = _pageStart;
 
-        Initialize();
-        GetReferencesToAssets();
-        FillInExel();
-        _excelPackage.SaveAs(_file);
-        Clean();
+        Work();
     }
 
     #endregion
 
     #region Methods
+
+    private void Work()
+    {
+        Console.WriteLine(Link());
+
+        Initialize();
+        GetReferencesToAssets();
+        FillInExel();
+        Clean();
+    }
 
     private void Initialize()
     {
@@ -114,13 +132,13 @@ public class ScrapingUnityAssetStore
             options.AddArgument("log-level=3");
             options.AddArgument("--ignore-certificate-errors-spki-list");
             options.AddArgument("--ignore-certificate-errors");
-            // options.AddArguments("headless");
+            options.AddArguments("headless");
 
             Console.WriteLine("Initializing drivers");
             _driver = new ChromeDriver(options);
             _driver.Manage().Timeouts().PageLoad = TimeSpan.FromSeconds(300);
-            _driver.Manage().Window.Maximize();
-            _driver.Navigate().GoToUrl(Link());
+            _driver?.Manage().Window.Maximize();
+            _driver?.Navigate().GoToUrl(Link());
         }
         catch (Exception e)
         {
@@ -131,20 +149,16 @@ public class ScrapingUnityAssetStore
         }
     }
 
-    private void Clean()
-    {
-        Console.WriteLine("Clean");
-        _driver.Close();
-    }
-
     private void GetReferencesToAssets()
     {
         Console.WriteLine("GetHrefAssets");
-        var elements = _driver.FindElements(By.ClassName(Element_ReferencesToAssets));
-        for (int i = _pageStart; i < _pageEnd; i++)
+        var elements = Element_ReferencesToAssets(_driver);
+        for (var i = _pageStart; i < _pageEnd; i++)
         {
-            if (_driver.Url != Link())
-                _driver.Url = Link();
+            if (_driver?.Url != Link())
+                _driver!.Url = Link();
+
+            if (elements == null) continue;
             foreach (var element in elements)
             {
                 var elem = element.FindElement(By.TagName("a")).GetAttribute("href");
@@ -153,40 +167,131 @@ public class ScrapingUnityAssetStore
                 Console.WriteLine($"GetHrefAsset completed {elem} ");
             }
         }
+
+        Console.WriteLine($"GetHrefAssets: {_linksToAssets.Count}");
     }
 
     private void FillInExel()
     {
         Console.WriteLine("FillInExel");
         var excelPackage = new ExcelPackage(_file);
-        excelPackage.Workbook.Worksheets.Add("DataBase Assets");
+        if (excelPackage.Workbook.Worksheets.Count == 0)
+            excelPackage.Workbook.Worksheets.Add("DataBase Assets");
         var worksheet = excelPackage.Workbook.Worksheets[0];
 
-        worksheet.Cells["A1"].Value = "Url";
-        worksheet.Cells["B1"].Value = "Name";
-        worksheet.Cells["C1"].Value = "Money";
-        worksheet.Cells["D1"].Value = "Size files";
-        worksheet.Cells["E1"].Value = "Description asset";
+        worksheet.Cells[$"A1"].Value = "url";
+        worksheet.Cells[$"B1"].Value = "name";
+        worksheet.Cells[$"C1"].Value = "author";
+        worksheet.Cells[$"D1"].Value = "grade";
+        worksheet.Cells[$"E1"].Value = "favorite";
+        worksheet.Cells[$"F1"].Value = "price";
+        worksheet.Cells[$"G1"].Value = "license type";
+        worksheet.Cells[$"H1"].Value = "file size";
+        worksheet.Cells[$"I1"].Value = "latest release date";
+        worksheet.Cells[$"J1"].Value = "description";
 
-        for (int i = 0; i < 100; i++)
+        for (var i = 0; i < _linksToAssets.Count; i++)
         {
             Console.WriteLine($"Scraping {i}\t{_linksToAssets[i]}");
             try
             {
-                _driver.Url = _linksToAssets[i];
-                var dataBase = Scraping(_driver);
+                _driver!.Url = _linksToAssets[i];
 
-                worksheet.Cells[$"A{i + 2}"].Value = $"{_driver.Url}";
-                worksheet.Cells[$"B{i + 2}"].Value = $"{dataBase.Item1}";
-                worksheet.Cells[$"C{i + 2}"].Value = $"{dataBase.Item2}";
-                worksheet.Cells[$"D{i + 2}"].Value = $"{dataBase.Item3}";
-                worksheet.Cells[$"E{i + 2}"].Value = $"{dataBase.Item4}";
+                try
+                {
+                    worksheet.Cells[$"A{i + 2}"].Value = $"{_driver?.Url}";
+                }
+                catch (Exception)
+                {
+                    // ignored
+                }
+
+                try
+                {
+                    worksheet.Cells[$"B{i + 2}"].Value = $"{Element_Packages_AssetName(_driver)?.Text}";
+                }
+                catch (Exception)
+                {
+                    // ignored
+                }
+
+                try
+                {
+                    worksheet.Cells[$"C{i + 2}"].Value = $"{Element_Packages_AssetAuthor(_driver)?.Text}";
+                }
+                catch (Exception)
+                {
+                    // ignored
+                }
+
+                try
+                {
+                    worksheet.Cells[$"D{i + 2}"].Value = $"{Element_Packages_AssetGrade(_driver)?.Text}";
+                }
+                catch (Exception)
+                {
+                    // ignored
+                }
+
+                try
+                {
+                    worksheet.Cells[$"E{i + 2}"].Value = $"{Element_Packages_AssetFavorite(_driver)?.Text}";
+                }
+                catch (Exception)
+                {
+                    // ignored
+                }
+
+                try
+                {
+                    worksheet.Cells[$"F{i + 2}"].Value = $"{Element_Packages_AssetPrice(_driver)?.Text}";
+                }
+                catch (Exception)
+                {
+                    // ignored
+                }
+
+                try
+                {
+                    worksheet.Cells[$"G{i + 2}"].Value = $"{Element_Packages_AssetLicenseType(_driver)?.Text}";
+                }
+                catch (Exception)
+                {
+                    // ignored
+                }
+
+                try
+                {
+                    worksheet.Cells[$"H{i + 2}"].Value = $"{Element_Packages_AssetFileSize(_driver)?.Text}";
+                }
+                catch (Exception)
+                {
+                    // ignored
+                }
+
+                try
+                {
+                    worksheet.Cells[$"I{i + 2}"].Value = $"{Element_Packages_AssetLatestReleaseDate(_driver)?.Text}";
+                }
+                catch (Exception)
+                {
+                    // ignored
+                }
+
+                try
+                {
+                    worksheet.Cells[$"J{i + 2}"].Value = $"{Element_Packages_AssetDescription(_driver)?.Text}";
+                }
+                catch (Exception)
+                {
+                    // ignored
+                }
             }
             catch (Exception e)
             {
                 Console.BackgroundColor = ConsoleColor.Blue;
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"Error {_driver.Url}");
+                Console.WriteLine($"Error {_driver!.Url}");
                 Console.BackgroundColor = ConsoleColor.Black;
                 Console.ForegroundColor = ConsoleColor.White;
                 Console.WriteLine(e);
@@ -199,15 +304,10 @@ public class ScrapingUnityAssetStore
         }
     }
 
-    private static (string, string, string, string) Scraping(IWebDriver driver)
+    private void Clean()
     {
-        Console.WriteLine("Scraping");
-        var elementAssetName = driver.FindElement(By.ClassName(Element_Packages_AssetName));
-        var elementAssetMoney = driver.FindElement(By.ClassName(Element_Packages_AssetMoney));
-        var elementAssetSize = driver.FindElement(By.ClassName(Element_Packages_AssetSizeFiles));
-        var elementAssetDescription = driver.FindElement(By.ClassName(Element_Packages_AssetDescription));
-
-        return (elementAssetName.Text, elementAssetMoney.Text, elementAssetSize.Text, elementAssetDescription.Text);
+        Console.WriteLine("Clean");
+        _driver?.Close();
     }
 
     #endregion
@@ -215,12 +315,38 @@ public class ScrapingUnityAssetStore
 
     #region Elements
 
-    private const string Element_ReferencesToAssets = "_138_e";
+    private static IWebElement? Element_ReferencesToAsset(ISearchContext? driver) =>
+        driver?.FindElement(By.ClassName("_138_e"));
 
-    private const string Element_Packages_AssetName = "cfm2v";
-    private const string Element_Packages_AssetMoney = "mErEH"; //mErEH _223RA
-    private const string Element_Packages_AssetSizeFiles = "_223RA";
-    private const string Element_Packages_AssetDescription = "_1_3uP";
+    private static ReadOnlyCollection<IWebElement>? Element_ReferencesToAssets(ISearchContext? driver) =>
+        driver?.FindElements(By.ClassName("_138_e"));
+
+    private static IWebElement? Element_Packages_AssetName(ISearchContext? driver) =>
+        driver?.FindElement(By.ClassName("cfm2v"));
+
+    private static IWebElement? Element_Packages_AssetAuthor(ISearchContext? driver) =>
+        driver?.FindElement(By.ClassName("U9Sw1"));
+
+    private static IWebElement? Element_Packages_AssetGrade(ISearchContext? driver) =>
+        driver?.FindElement(By.ClassName("NoXio"));
+
+    private static IWebElement? Element_Packages_AssetFavorite(ISearchContext? driver) =>
+        driver?.FindElement(By.ClassName("ifont-favorite"));
+
+    private static IWebElement? Element_Packages_AssetPrice(ISearchContext? driver) =>
+        driver?.FindElement(By.ClassName("mErEH"));
+
+    private static IWebElement? Element_Packages_AssetLicenseType(ISearchContext? driver) =>
+        driver?.FindElement(By.ClassName("product-license")).FindElement(By.ClassName("SoNzt"));
+
+    private static IWebElement? Element_Packages_AssetFileSize(ISearchContext? driver) =>
+        driver?.FindElement(By.ClassName("product-size")).FindElement(By.ClassName("SoNzt"));
+
+    private static IWebElement? Element_Packages_AssetLatestReleaseDate(ISearchContext? driver) =>
+        driver?.FindElement(By.ClassName("product-date")).FindElement(By.ClassName("SoNzt"));
+
+    private static IWebElement? Element_Packages_AssetDescription(ISearchContext? driver) =>
+        driver?.FindElement(By.ClassName("_1_3uP"));
 
     #endregion
 }
