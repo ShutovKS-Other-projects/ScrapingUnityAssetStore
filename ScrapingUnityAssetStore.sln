@@ -1,6 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ParsingMarketPlaces", "ParsingMarketPlaces.csproj", "{64EAB214-5F4D-4DED-A7FD-439AE6DE9DD2}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ScrapingUnityAssetStore", "ScrapingUnityAssetStore.csproj", "{64EAB214-5F4D-4DED-A7FD-439AE6DE9DD2}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
